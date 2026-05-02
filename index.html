@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASS-CONTROL // Physics Test</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/exitgames/photon-javascript-sdk@master/dist/Photon-Javascript_SDK.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #crosshair {
@@ -180,10 +180,11 @@
     </div>
 
     <div id="multiplayer-ui">
-        <div>NETWORK: <span id="net-status" style="color: #ff5555;">OFFLINE (CLICK GO ONLINE)</span></div>
-        <div id="my-id-display" style="display:none; margin-top:5px;">MY ID: <span id="my-id" style="color:#00ffff;">...</span></div>
-        <input type="text" id="peer-id-input" placeholder="ENTER FRIEND ID">
-        <button id="btn-connect">CONNECT</button>
+        <div>NETWORK: <span id="net-status" style="color: #ff5555;">OFFLINE</span></div>
+        <input type="text" id="appid-input" value="759dd758-56a5-44f2-9cb3-1b38c9f65a3f" style="width: 180px;">
+        <div id="room-info" style="display:none; margin-top:5px;">ROOM: <span id="room-name" style="color:#00ffff;">...</span></div>
+        <input type="text" id="room-input" placeholder="ROOM NAME">
+        <button id="btn-join">JOIN ROOM</button>
         <button id="btn-host">GO ONLINE</button>
     </div>
 
@@ -530,11 +531,9 @@
         function completeLevel() {
             if (!levelActive) return;
             levelActive = false;
-
-            // Multiplayer: Sync level change
-            connections.forEach(c => {
-                c.send({ type: 'level-change', num: currentLevel + 1 });
-            });
+            if (photonClient && photonClient.isJoinedToRoom()) {
+                photonClient.raiseEvent(3, { level: currentLevel + 1 }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.All });
+            }
 
             const lv = levels[currentLevel - 1];
             const t = Math.floor((Date.now() - levelStartTime) / 1000);
@@ -707,8 +706,15 @@
         });
 
         // ─── MULTIPLAYER LOGIC ────────────────────────────────────
-        let peer = null;
-        let connections = [];
+        let photonClient = null;
+        let currentRoom = null;
+
+        const EV = {
+            MOVE: 1,
+            SYNC_OBJ: 2,
+            LEVEL_CHANGE: 3,
+            CHAT: 4
+        };
 
         function showNotification(text) {
             const container = document.getElementById('notifications');
@@ -719,97 +725,85 @@
             setTimeout(() => div.remove(), 5000);
         }
 
-        function initPeer(id = null) {
-            document.getElementById('net-status').textContent = 'CONNECTING...';
-            document.getElementById('net-status').style.color = '#ffff00';
-            peer = id ? new Peer(id) : new Peer();
-            peer.on('open', myId => {
-                document.getElementById('net-status').textContent = 'ONLINE';
-                document.getElementById('net-status').style.color = '#00ff00';
-                document.getElementById('my-id').textContent = myId;
-                document.getElementById('my-id-display').style.display = 'block';
-                showNotification(`NETWORK READY: ${myId}`);
-            });
-            peer.on('connection', conn => setupConn(conn));
-            peer.on('error', err => {
-                console.error(err);
-                document.getElementById('net-status').textContent = 'ERROR';
-                document.getElementById('net-status').style.color = '#ff0000';
-                showNotification(`NET ERROR: ${err.type}`);
-            });
-        }
-
-        function setupConn(conn) {
-            connections.push(conn);
-            conn.on('data', data => {
-                if (data.type === 'move') {
-                    let p = otherPlayers.get(conn.peer);
-                    if (!p) {
-                        p = createPlayerModel(conn.peer);
-                        scene.add(p);
-                        otherPlayers.set(conn.peer, p);
-                        showNotification(`PLAYER JOINED: ${conn.peer.slice(0,6)}...`);
-                    }
-                    p.position.set(data.pos.x, data.pos.y - 0.5, data.pos.z);
-                    p.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
-                }
-                if (data.type === 'sync-obj' && data.idx < bodies.length) {
-                    const b = bodies[data.idx];
-                    // Only sync if we aren't the one currently holding it
-                    if (!heldObject || heldObject.body !== b) {
-                        b.position.set(data.pos.x, data.pos.y, data.pos.z);
-                        b.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
-                        b.velocity.set(0,0,0);
-                        b.angularVelocity.set(0,0,0);
-                    }
-                }
-                if (data.type === 'level-change' && data.num !== currentLevel) {
-                    loadLevel(data.num);
-                }
-                if (data.type === 'chat') {
-                    addChatMessage(data.sender, data.msg);
-                }
-            });
+        function initPhoton(appId, roomName = "lobby") {
+            photonClient = new Photon.LoadBalancing.LoadBalancingClient(Photon.ConnectionProtocol.Wss, appId, "1.0");
             
-            conn.on('close', () => {
-                const p = otherPlayers.get(conn.peer);
-                if (p) {
-                    scene.remove(p);
-                    otherPlayers.delete(conn.peer);
-                    showNotification(`PLAYER LEFT: ${conn.peer.slice(0,6)}...`);
+            photonClient.onStateChange = (state) => {
+                const status = document.getElementById('net-status');
+                if (state === Photon.LoadBalancing.ClientState.Joined) {
+                    status.textContent = 'ONLINE'; status.style.color = '#00ff00';
+                    document.getElementById('appid-input').style.display = 'none';
+                    document.getElementById('room-name').textContent = photonClient.myRoom().name;
+                    document.getElementById('room-info').style.display = 'block';
+                    showNotification(`JOINED ROOM: ${photonClient.myRoom().name}`);
                 }
-                connections = connections.filter(c => c !== conn);
-            });
+            };
 
-            // Send initial state to new player
-            if (peer) conn.send({ type: 'level', num: currentLevel });
+            photonClient.onActorJoin = (actor) => {
+                if (actor.actorNr === photonClient.myActor().actorNr) return;
+                const p = createPlayerModel(actor.actorNr.toString());
+                scene.add(p);
+                otherPlayers.set(actor.actorNr, p);
+                showNotification(`PLAYER JOINED: ${actor.actorNr}`);
+            };
+
+            photonClient.onActorLeave = (actor) => {
+                const p = otherPlayers.get(actor.actorNr);
+                if (p) { scene.remove(p); otherPlayers.delete(actor.actorNr); }
+                showNotification(`PLAYER LEFT: ${actor.actorNr}`);
+            };
+
+            photonClient.onEvent = (code, content, actorNr) => {
+                if (code === EV.MOVE) {
+                    const p = otherPlayers.get(actorNr);
+                    if (p) {
+                        p.position.set(content.pos.x, content.pos.y - 0.5, content.pos.z);
+                        p.quaternion.set(content.quat.x, content.quat.y, content.quat.z, content.quat.w);
+                    }
+                }
+                if (code === EV.SYNC_OBJ && content.idx < bodies.length) {
+                    const b = bodies[content.idx];
+                    if (!heldObject || bodies.indexOf(heldObject.body) !== content.idx) {
+                        b.position.set(content.pos.x, content.pos.y, content.pos.z);
+                        b.quaternion.set(content.quat.x, content.quat.y, content.quat.z, content.quat.w);
+                    }
+                }
+                if (code === EV.LEVEL_CHANGE) loadLevel(content.level);
+                if (code === EV.CHAT) addChatMessage(content.sender, content.msg);
+            };
+
+            photonClient.connectToRegionMaster("EU"); // Change region if needed
+            photonClient.onRoomList = () => photonClient.joinOrCreateRoom(roomName, { maxPlayers: 8 }, {});
         }
 
-        document.getElementById('btn-host').addEventListener('click', () => initPeer());
-        document.getElementById('btn-connect').addEventListener('click', () => {
-            if (!peer) initPeer();
-            const friendId = document.getElementById('peer-id-input').value;
-            if (friendId) setupConn(peer.connect(friendId));
+        document.getElementById('btn-host').addEventListener('click', () => {
+            const appId = document.getElementById('appid-input').value.trim();
+            if (appId) initPhoton(appId, "lobby");
+            else alert("Please enter a Photon App ID");
+        });
+        
+        document.getElementById('btn-join').addEventListener('click', () => {
+            const appId = document.getElementById('appid-input').value.trim();
+            const room = document.getElementById('room-input').value.trim() || "lobby";
+            if (appId) initPhoton(appId, room);
+            else alert("Please enter a Photon App ID");
         });
 
         function broadcastPos() {
-            if (!peer || connections.length === 0) return;
-            const data = {
-                type: 'move',
-                pos: camera.position,
-                quat: camera.quaternion
-            };
-            connections.forEach(c => c.send(data));
+            if (!photonClient || !photonClient.isJoinedToRoom()) return;
+            
+            photonClient.raiseEvent(EV.MOVE, {
+                pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                quat: { x: camera.quaternion.x, y: camera.quaternion.y, z: camera.quaternion.z, w: camera.quaternion.w }
+            }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.Others });
 
-            // Sync held object
             if (heldObject) {
-                const syncData = {
-                    type: 'sync-obj',
-                    idx: bodies.indexOf(heldObject.body),
-                    pos: heldObject.body.position,
-                    quat: heldObject.body.quaternion
-                };
-                connections.forEach(c => c.send(syncData));
+                const idx = bodies.indexOf(heldObject.body);
+                photonClient.raiseEvent(EV.SYNC_OBJ, {
+                    idx: idx,
+                    pos: { x: heldObject.body.position.x, y: heldObject.body.position.y, z: heldObject.body.position.z },
+                    quat: { x: heldObject.body.quaternion.x, y: heldObject.body.quaternion.y, z: heldObject.body.quaternion.z, w: heldObject.body.quaternion.w }
+                }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.Others });
             }
         }
 
@@ -828,9 +822,10 @@
         function sendChat() {
             const msg = chatInput.value.trim();
             if (!msg) return;
-            const senderId = peer ? peer.id.slice(0, 4).toUpperCase() : "USR";
-            const data = { type: 'chat', msg, sender: senderId };
-            connections.forEach(c => c.send(data));
+            const sender = photonClient ? photonClient.myActor().actorNr : "USR";
+            if (photonClient && photonClient.isJoinedToRoom()) {
+                photonClient.raiseEvent(EV.CHAT, { msg, sender });
+            }
             addChatMessage('YOU', msg);
             chatInput.value = '';
             chatInput.blur();
@@ -1013,3 +1008,4 @@
     </script>
 </body>
 </html>
+
