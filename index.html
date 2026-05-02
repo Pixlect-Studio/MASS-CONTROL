@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MASS-CONTROL // Physics Test</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            pointer-events: none; z-index: 10;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute;
+            background: rgba(255,255,255,0.9);
+        }
+        #crosshair::before { width: 2px; height: 12px; left: 9px; top: 4px; }
+        #crosshair::after  { width: 12px; height: 2px; left: 4px; top: 9px; }
+        #crosshair-dot {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px; height: 4px; border-radius: 50%;
+            background: white; pointer-events: none; z-index: 11;
+            transition: transform 0.1s, background 0.1s;
+        }
+        #crosshair-dot.aim { transform: translate(-50%, -50%) scale(2.5); background: #00ffff; }
+        #crosshair-dot.held { transform: translate(-50%, -50%) scale(1.5); background: #00ff88; }
+        #debug-panel {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.85); color: #00ff00;
+            border: 1px solid #00ff0055; padding: 10px 14px;
+            pointer-events: none; z-index: 99;
+            font-size: 11px; font-family: monospace;
+        }
+        #debug-panel div { margin: 3px 0; }
+        .dl { color: #aaaaaa; }
+        .dv { color: #00ff88; }
+        #level-panel {
+            position: absolute; top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85); color: #00ffff;
+            border: 1px solid #00ffff55; padding: 12px 20px;
+            pointer-events: none; z-index: 100;
+            font-size: 13px; text-align: center; font-family: monospace;
+        }
+        #level-panel h3 { margin: 0 0 6px 0; letter-spacing: 2px; }
+        #objective { color: #ffff00; margin: 5px 0; font-size: 11px; }
+        #rank-panel {
+            position: absolute; bottom: 20px; left: 20px;
+            color: #00ff00; font-family: monospace;
+            pointer-events: none; z-index: 5; font-size: 11px;
+            line-height: 1.6;
+        }
+        #ui {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5); text-align: center;
+            pointer-events: none; z-index: 5; font-size: 11px;
+            font-family: monospace; letter-spacing: 1px;
+        }
+        #hold-indicator {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, 40px);
+            pointer-events: none; z-index: 10;
+            font-family: monospace; font-size: 11px;
+            color: #00ff88; letter-spacing: 2px;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        #hold-indicator.visible { opacity: 1; }
+        #level-complete {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95); color: #00ff00;
+            border: 2px solid #00ff00; padding: 30px 40px;
+            text-align: center; z-index: 200;
+            pointer-events: auto; display: none;
+            box-shadow: 0 0 40px #00ff0044;
+            font-family: monospace;
+        }
+        #level-complete h2 { margin: 0 0 10px; font-size: 28px; letter-spacing: 4px; }
+        #level-complete p { font-size: 13px; margin: 8px 0; color: #aaffaa; }
+        #level-complete button {
+            background: transparent; color: #00ff00; border: 1px solid #00ff00;
+            padding: 10px 24px; margin: 8px 6px; cursor: pointer;
+            font-weight: bold; font-size: 13px; font-family: monospace;
+            letter-spacing: 2px; transition: all 0.15s;
+        }
+        #level-complete button:hover { background: #00ff00; color: #000; }
+        #editor-panel {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.9); color: #00ff00;
+            border: 1px solid #00ff0055; padding: 15px;
+            width: 260px; max-height: 500px; overflow-y: auto;
+            pointer-events: auto; z-index: 100;
+            font-size: 12px; font-family: monospace;
+        }
+        #editor-panel h3 { margin: 0 0 10px 0; border-bottom: 1px solid #00ff0033; letter-spacing: 2px; }
+        #editor-panel button {
+            background: transparent; color: #00ff00; border: 1px solid #00ff0066;
+            padding: 6px 10px; margin: 3px 0; cursor: pointer;
+            width: 100%; font-family: monospace; font-size: 11px;
+            letter-spacing: 1px; transition: all 0.1s;
+        }
+        #editor-panel button:hover { background: #00ff00; color: #000; }
+        #editor-panel label { display: block; margin: 8px 0 3px; color: #aaaaaa; font-size: 10px; letter-spacing: 1px; }
+        #editor-panel input[type=range] { width: 100%; margin-bottom: 8px; accent-color: #00ff00; }
+
+        #multiplayer-ui {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0,0,0,0.8); color: #00ff00;
+            padding: 10px; font-family: monospace; font-size: 10px;
+            border: 1px solid #00ff0033; z-index: 101;
+        }
+        #door-indicator {
+            position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+            width: 60px; height: 10px; background: #300; border: 2px solid #111;
+            z-index: 50; box-shadow: 0 0 10px #ff000033;
+        }
+        #chat-container {
+            position: absolute; bottom: 150px; left: 20px;
+            width: 280px; height: 160px;
+            background: rgba(0,0,0,0.8); border: 1px solid #00ffff33;
+            display: flex; flex-direction: column;
+            pointer-events: auto; z-index: 151;
+            font-family: monospace; font-size: 11px;
+        }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 8px; color: #00ffff; }
+        #chat-messages div { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
+        #chat-input {
+            background: #050505; border: none; border-top: 1px solid #00ffff33;
+            color: #00ffff; padding: 8px; font-family: monospace; outline: none;
+        }
+        #notifications {
+            position: absolute; bottom: 80px; left: 20px;
+            z-index: 150; font-family: monospace;
+            pointer-events: none;
+        }
+        .notif {
+            background: rgba(0,255,255,0.1); color: #00ffff;
+            padding: 5px 10px; margin-top: 5px; border-left: 3px solid #00ffff;
+            font-size: 11px; animation: fadeout 5s forwards;
+        }
+        @keyframes fadeout { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+        #multiplayer-ui input { 
+            background: #111; border: 1px solid #00ff0055; color: #00ff00; 
+            padding: 4px; width: 120px; margin-top: 5px; font-family: monospace;
+        }
+        #multiplayer-ui button { background: #00ff0022; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; padding: 4px 8px; }
+    </style>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <div id="crosshair-dot"></div>
+    <div id="hold-indicator">[ HOLDING — SCROLL TO ADJUST DISTANCE ]</div>
+    <div id="door-indicator"></div>
+
+    <div id="chat-container">
+        <div id="chat-messages"></div>
+        <input type="text" id="chat-input" placeholder="PRESS ENTER TO CHAT..." autocomplete="off">
+    </div>
+
+    <div id="notifications"></div>
+
+    <div id="debug-panel">
+        <div><span class="dl">STATE </span><span class="dv" id="debug-state">IDLE</span></div>
+        <div><span class="dl">DIST  </span><span class="dv" id="debug-dist">—</span></div>
+        <div><span class="dl">SPEED </span><span class="dv" id="debug-speed">—</span></div>
+        <div><span class="dl">OBJS  </span><span class="dv" id="debug-objects">0</span></div>
+    </div>
+
+    <div id="rank-panel">
+        <div>RANK: <span id="rank">TRAINEE</span></div>
+        <div>SCORE: <span id="score">0</span></div>
+        <div>LEVEL: <span id="current-level">1</span>/6</div>
+        <div>TIME: <span id="timer">0s</span></div>
+    </div>
+
+    <div id="multiplayer-ui">
+        <div>NETWORK: <span id="net-status" style="color: #ff5555;">OFFLINE (CLICK GO ONLINE)</span></div>
+        <div id="my-id-display" style="display:none; margin-top:5px;">MY ID: <span id="my-id" style="color:#00ffff;">...</span></div>
+        <input type="text" id="peer-id-input" placeholder="ENTER FRIEND ID">
+        <button id="btn-connect">CONNECT</button>
+        <button id="btn-host">GO ONLINE</button>
+    </div>
+
+    <div id="level-panel">
+        <h3>LEVEL <span id="level-number">1</span></h3>
+        <div id="objective">Loading...</div>
+        <div id="progress">Progress: 0/1</div>
+    </div>
+
+    <div id="ui">
+        WASD MOVE &nbsp;|&nbsp; E EDITOR &nbsp;|&nbsp; CLICK GRAB &nbsp;|&nbsp; RELEASE THROW &nbsp;|&nbsp; SCROLL DISTANCE
+    </div>
+
+    <div id="level-complete">
+        <h2>LEVEL COMPLETE</h2>
+        <p id="completion-text">Well done!</p>
+        <p>Score: <span id="final-score">0</span> &nbsp;|&nbsp; Time: <span id="final-time">0s</span></p>
+        <button id="next-level">NEXT LEVEL →</button>
+        <button id="retry-level">↺ RETRY</button>
+    </div>
+
+    <div id="editor-panel" style="display:none;">
+        <h3>// EDITOR</h3>
+        <button id="add-box">+ BOX (1×1×1)</button>
+        <button id="add-large-box">+ LARGE BOX (2×2)</button>
+        <button id="add-sphere">+ SPHERE</button>
+        <button id="add-cylinder">+ CYLINDER</button>
+        <hr style="border-color: #00ff0022; margin: 10px 0;">
+        <label>GRAVITY: <span id="gravity-value">9.8</span></label>
+        <input type="range" id="gravity-slider" min="0" max="50" step="0.1" value="9.8">
+        <label>SPAWN MASS: <span id="mass-value">1.0</span></label>
+        <input type="range" id="mass-slider" min="0.1" max="10" step="0.1" value="1">
+        <hr style="border-color: #00ff0022; margin: 10px 0;">
+        <button id="delete-last">DELETE LAST</button>
+        <button id="clear-all">CLEAR ALL</button>
+        <button id="reset-level">RESET LEVEL</button>
+        <div id="object-count" style="color:#555; margin-top:10px; font-size:10px;">OBJECTS: 0</div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import * as CANNON from 'cannon-es';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // ─── GAME STATE ───────────────────────────────────────────
+        let currentLevel = 1;
+        let totalScore = 0;
+        let levelStartTime = Date.now();
+        let onPlateCount = 0;
+        let plateTime = 0;
+        let levelActive = true;
+        const ranks = ["TRAINEE", "CADET", "AGENT", "MASTER", "ELITE", "LEGEND"];
+
+        const levels = [
+            { name: "01: INITIATION", objective: "Activate the floor button", count: 1, gravity: 9.8, reward: 100, description: "Drop the cube onto the testing plate." },
+            { name: "02: OBSTRUCTION", objective: "Toss over the barrier", count: 1, gravity: 9.8, reward: 200, description: "The plate is behind the containment wall." },
+            { name: "03: MOMENTUM", objective: "Long distance delivery", count: 1, gravity: 9.8, reward: 300, description: "The sphere must stay on the distant plate." },
+            { name: "04: MULTIPLICITY", objective: "Double weight required", count: 2, gravity: 12, reward: 400, description: "Both cubes are required to trigger the circuit." },
+            { name: "05: ELEVATION", objective: "High ground plate", count: 1, gravity: 5, reward: 500, description: "Low gravity test. Get the cube to the ledge." },
+            { name: "06: STABILITY", objective: "Hold for 3 seconds", count: 3, gravity: 9.8, reward: 1000, description: "Final test: Keep all objects on the plate." }
+        ];
+
+        // ─── PHYSICS WORLD ────────────────────────────────────────
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.8, 0);
+        world.broadphase = new CANNON.SAPBroadphase(world);
+        world.defaultContactMaterial.friction = 0.4;
+        world.defaultContactMaterial.restitution = 0.35;
+
+        // ─── SCENE ────────────────────────────────────────────────
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+        scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 200);
+        camera.position.set(0, 1.6, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // ─── LIGHTING ─────────────────────────────────────────────
+        scene.add(new THREE.AmbientLight(0x223344, 1.2));
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+        sun.position.set(8, 20, 8);
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.camera.near = 0.5;
+        sun.shadow.camera.far = 60;
+        sun.shadow.camera.left = sun.shadow.camera.bottom = -20;
+        sun.shadow.camera.right = sun.shadow.camera.top = 20;
+        scene.add(sun);
+        const fill = new THREE.DirectionalLight(0x334466, 0.6);
+        fill.position.set(-6, 6, -4);
+        scene.add(fill);
+
+        // ─── FLOOR ────────────────────────────────────────────────
+        const floorMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(50, 50),
+            new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.8, metalness: 0.2 })
+        );
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.receiveShadow = true;
+        scene.add(floorMesh);
+
+        const grid = new THREE.GridHelper(50, 50, 0x00ff00, 0x112211);
+        grid.position.y = 0.002;
+        grid.material.opacity = 0.2;
+        grid.material.transparent = true;
+        scene.add(grid);
+
+        const floorBody = new CANNON.Body({ mass: 0 });
+        floorBody.addShape(new CANNON.Plane());
+        floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        world.addBody(floorBody);
+
+        // ─── PRESSURE PLATE ───────────────────────────────────────
+        let plateBase, plateMesh;
+        function createPlate(x, y, z) {
+            plateBase = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.2, 4.5), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            plateBase.position.set(x, y + 0.1, z);
+            scene.add(plateBase);
+
+            const plateGeo = new THREE.BoxGeometry(4, 0.3, 4);
+            const plateMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
+            plateMesh = new THREE.Mesh(plateGeo, plateMat);
+            plateMesh.position.set(x, y + 0.2, z);
+            scene.add(plateMesh);
+        }
+        createPlate(0, 0, -12);
+
+        // ─── WALLS ────────────────────────────────────────────────
+        const extraWalls = [];
+        function makeWall(w, h, d, x, y, z, color = 0x1a1a2e, isExtra = false) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(w, h, d),
+                new THREE.MeshStandardMaterial({ color: color, roughness: 0.8, transparent: color === 0x4488ff, opacity: color === 0x4488ff ? 0.3 : 1 })
+            );
+            if (color === 0x4488ff) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x00ffff })));
+            mesh.position.set(x, y, z);
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            const body = new CANNON.Body({ mass: 0 });
+            body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
+            body.position.set(x, y, z);
+            world.addBody(body);
+            if (isExtra) extraWalls.push({ mesh, body });
+            return { mesh, body };
+        }
+
+        function buildRoom() {
+            makeWall(50, 15, 1, 0, 7.5, -25); // Back
+            makeWall(50, 15, 1, 0, 7.5, 25);  // Front
+            makeWall(1, 15, 50, -25, 7.5, 0); // Left
+            makeWall(1, 15, 50, 25, 7.5, 0);  // Right
+            makeWall(50, 1, 50, 0, 15, 0);    // Ceiling
+        }
+        buildRoom();
+
+        // ─── DYNAMIC OBJECTS ──────────────────────────────────────
+        const bodies = [];
+        const meshes = [];
+        let editorMode = false;
+        let currentMass = 1;
+
+        const PALETTE = [0x00aaff, 0xff5555, 0x55ff88, 0xffaa00, 0xaa55ff, 0xff55bb];
+        
+        // Placeholder for other players
+        const otherPlayers = new Map();
+        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
+
+        function createPlayerTag(text) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 256; canvas.height = 64;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, 256, 64);
+            ctx.font = 'bold 32px monospace';
+            ctx.fillStyle = '#00ffff';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, 128, 45);
+            const tex = new THREE.CanvasTexture(canvas);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+            sprite.scale.set(1.5, 0.375, 1);
+            sprite.position.y = 1.4;
+            return sprite;
+        }
+
+        function createPlayerModel(id) {
+            const group = new THREE.Group();
+            // Torso
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), playerMaterial);
+            group.add(body);
+            // Head
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), playerMaterial);
+            head.position.y = 0.65;
+            group.add(head);
+            // Visor
+            const visor = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.1, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 1 })
+            );
+            visor.position.set(0, 0.7, -0.18);
+            group.add(visor);
+            // Tag
+            group.add(createPlayerTag(id.slice(0, 6).toUpperCase()));
+            return group;
+        }
+
+        function addDynamicObject(geometry, position, mass, colorHex) {
+            const col = colorHex ?? PALETTE[meshes.length % PALETTE.length];
+            const mat = new THREE.MeshStandardMaterial({
+                color: col,
+                emissive: col,
+                emissiveIntensity: 0.12,
+                roughness: 0.4,
+                metalness: 0.3,
+            });
+            const mesh = new THREE.Mesh(geometry, mat);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.position.copy(position);
+            scene.add(mesh);
+            meshes.push(mesh);
+
+            let shape;
+            const p = geometry.parameters;
+            if (geometry.type === 'BoxGeometry')
+                shape = new CANNON.Box(new CANNON.Vec3(p.width / 2, p.height / 2, p.depth / 2));
+            else if (geometry.type === 'SphereGeometry')
+                shape = new CANNON.Sphere(p.radius);
+            else if (geometry.type === 'CylinderGeometry')
+                shape = new CANNON.Cylinder(p.radiusTop, p.radiusBottom, p.height, 12);
+
+            const body = new CANNON.Body({ mass, shape, linearDamping: 0.12, angularDamping: 0.4 });
+            body.position.copy(position);
+            world.addBody(body);
+            bodies.push(body);
+
+            return { mesh, body };
+        }
+
+        // ─── LEVEL LOADING ────────────────────────────────────────
+        let doorMesh = null, doorBody = null;
+        let doorTargetY = 3.5;
+
+        function loadLevel(num) {
+            currentLevel = num;
+            onPlateCount = 0;
+            plateTime = 0;
+            levelActive = true;
+            levelStartTime = Date.now();
+            releaseObject(); // drop anything held
+
+            // Cleanup Dynamic Objects
+            for (let i = meshes.length - 1; i >= 0; i--) {
+                scene.remove(meshes[i]);
+                world.removeBody(bodies[i]);
+            }
+            meshes.length = 0;
+            bodies.length = 0;
+
+            // Cleanup Level-Specific Walls and Doors
+            for (const w of extraWalls) {
+                if (w.mesh) scene.remove(w.mesh);
+                if (w.body) world.removeBody(w.body);
+            }
+            extraWalls.length = 0;
+            doorMesh = null;
+            doorBody = null;
+
+            const lv = levels[num - 1];
+            world.gravity.y = -lv.gravity;
+
+            const cols = [0x00aaff, 0xff5544, 0x44ffaa, 0xffcc00, 0xaa44ff];
+            for (let i = 0; i < lv.count; i++) {
+                const isSphereLevel = num === 3;
+                const isSphere = isSphereLevel;
+                let pos;
+                if (lv.count === 1)      pos = new THREE.Vector3(0, 2, -2);
+                else if (lv.count === 2) pos = new THREE.Vector3((i - 0.5) * 4, 2, -6);
+                else                     pos = new THREE.Vector3((i - 1) * 3, 2 + i * 0.3, -5 - i * 0.5);
+
+                if (isSphere) {
+                    addDynamicObject(new THREE.SphereGeometry(0.55, 32, 32), pos, 1, cols[i]);
+                } else {
+                    const sz = num === 5 ? 1.4 : 1;
+                    addDynamicObject(new THREE.BoxGeometry(sz, sz, sz), pos, num === 5 ? 5 : 1, cols[i]);
+                }
+            }
+
+            // Add some obstacles for later levels
+            if (num >= 4) makeWall(4, 8, 4, 5, 4, -8, 0x333333);
+
+            document.getElementById('level-complete').style.display = 'none';
+            updateLevelUI();
+        }
+
+        function updateLevelUI() {
+            const lv = levels[currentLevel - 1];
+            document.getElementById('level-number').textContent = currentLevel;
+            document.getElementById('progress').textContent = `Pressure Plate: ${onPlateCount}/${lv.count}`;
+            document.getElementById('current-level').textContent = currentLevel;
+            document.getElementById('debug-objects').textContent = meshes.length;
+            document.getElementById('object-count').textContent = 'OBJECTS: ' + meshes.length;
+        }
+
+        function updateHUD() {
+            if (document.getElementById('level-complete').style.display !== 'block') {
+                const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
+                document.getElementById('timer').textContent = elapsed + 's';
+            }
+            const ri = Math.min(Math.floor(totalScore / 500), ranks.length - 1);
+            document.getElementById('rank').textContent = ranks[ri];
+            document.getElementById('score').textContent = totalScore;
+
+            // debug
+            document.getElementById('debug-state').textContent =
+                heldObject ? 'HOLDING' : isLooking ? 'AIMING' : 'IDLE';
+            if (heldObject) {
+                const d = camera.position.distanceTo(heldObject.mesh.position).toFixed(2);
+                const v = heldObject.body.velocity.length().toFixed(2);
+                document.getElementById('debug-dist').textContent = d + 'm';
+                document.getElementById('debug-speed').textContent = v + 'm/s';
+            } else {
+                document.getElementById('debug-dist').textContent = '—';
+                document.getElementById('debug-speed').textContent = '—';
+            }
+        }
+
+        function completeLevel() {
+            if (!levelActive) return;
+            levelActive = false;
+
+            // Multiplayer: Sync level change
+            connections.forEach(c => {
+                c.send({ type: 'level-change', num: currentLevel + 1 });
+            });
+
+            const lv = levels[currentLevel - 1];
+            const t = Math.floor((Date.now() - levelStartTime) / 1000);
+            const bonus = Math.max(0, 300 - t * 10);
+            const s = lv.reward + bonus;
+            totalScore += s;
+
+            document.getElementById('completion-text').textContent =
+                currentLevel < 6 ? `Level ${currentLevel} cleared!` : '✦ GAME COMPLETE — YOU ARE LEGEND ✦';
+            document.getElementById('final-score').textContent = s;
+            document.getElementById('final-time').textContent = t + 's';
+            document.getElementById('next-level').style.display = currentLevel < 6 ? 'inline-block' : 'none';
+            document.getElementById('level-complete').style.display = 'block';
+        }
+
+        // ─── CONTROLS ────────────────────────────────────────────
+        const controls = new PointerLockControls(camera, document.body);
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+
+        document.addEventListener('click', () => {
+            if (!editorMode && document.getElementById('level-complete').style.display !== 'block')
+                if (!controls.isLocked) controls.lock();
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.code === 'KeyW') moveForward  = true;
+            if (e.code === 'KeyS') moveBackward = true;
+            if (e.code === 'KeyA') moveLeft      = true;
+            if (e.code === 'KeyD') moveRight     = true;
+            if (e.code === 'KeyE') {
+                editorMode = !editorMode;
+                document.getElementById('editor-panel').style.display = editorMode ? 'block' : 'none';
+                if (editorMode && controls.isLocked) controls.unlock();
+            }
+        });
+        document.addEventListener('keyup', e => {
+            if (e.code === 'KeyW') moveForward  = false;
+            if (e.code === 'KeyS') moveBackward = false;
+            if (e.code === 'KeyA') moveLeft      = false;
+            if (e.code === 'KeyD') moveRight     = false;
+        });
+
+        // ─── PORTAL-STYLE GRAVITY GUN ─────────────────────────────
+        //
+        // How Portal's Gravity Gun works:
+        //   1. Click: Raycast. If you hit something, smoothly PULL it toward
+        //      a "carry point" in front of the camera (spring physics, not teleport).
+        //   2. While held: The object floats at carry point, damped so it follows
+        //      your look without clipping. Object can still rotate naturally.
+        //   3. Scroll: Adjust carry distance.
+        //   4. Release: The object inherits your camera's look direction × throw force.
+        //
+        // Key differences from original code:
+        //   - Uses spring/force approach instead of teleporting body.position
+        //   - Mass is NEVER zeroed — we apply impulses each frame
+        //   - Throw velocity computed from camera direction on release
+        //   - Hold distance adjustable with scroll
+        //   - Smooth pickup arc (object travels toward you over ~0.3s)
+        //   - Crosshair changes based on what you're aiming at / holding
+
+        const HOLD_DIST_DEFAULT = 3.5;
+        const HOLD_DIST_MIN = 1.5;
+        const HOLD_DIST_MAX = 6.0;
+        const SPRING_STIFFNESS = 160;   // Higher = snappier pull  (Portal is ~150-200)
+        const SPRING_DAMPING   = 18;    // Higher = less oscillation
+        const MAX_GRAB_RANGE   = 8.0;   // Max distance to grab from
+        const THROW_FORCE      = 22;    // m/s on release
+
+        let heldObject    = null;   // { mesh, body, origMass, origLinearDamp, origAngularDamp }
+        let holdDistance  = HOLD_DIST_DEFAULT;
+        let isLooking     = false;  // crosshair is over a grabbable object
+
+        const raycaster   = new THREE.Raycaster();
+        const _camDir     = new THREE.Vector3();
+        const _targetPos  = new THREE.Vector3();
+        const _delta      = new THREE.Vector3();
+        const _force      = new CANNON.Vec3();
+        const _impulse    = new CANNON.Vec3();
+
+        // Track last camera velocity for throw
+        const _prevCamPos  = new THREE.Vector3();
+        const _camVelocity = new THREE.Vector3();
+
+        function grabObject(mesh) {
+            const idx = meshes.indexOf(mesh);
+            if (idx < 0) return;
+            if (heldObject && heldObject.mesh === mesh) return;
+            if (heldObject) releaseObject(false); // drop old one silently
+
+            const body = bodies[idx];
+            heldObject = {
+                mesh,
+                body,
+                origMass:          body.mass,
+                origLinearDamp:    body.linearDamping,
+                origAngularDamp:   body.angularDamping,
+            };
+
+            // Reduce damping while held so spring forces work cleanly
+            body.linearDamping  = 0.92;   // high damping = floaty/stable
+            body.angularDamping = 0.95;
+
+            // Set hold distance to wherever the object currently is
+            holdDistance = Math.min(MAX_GRAB_RANGE,
+                Math.max(HOLD_DIST_MIN, camera.position.distanceTo(mesh.position)));
+
+            // Glow effect
+            if (mesh.material) {
+                mesh.material.emissiveIntensity = 0.55;
+                mesh.material.needsUpdate = true;
+            }
+
+            document.getElementById('hold-indicator').classList.add('visible');
+            document.getElementById('crosshair-dot').className = 'held';
+        }
+
+        function releaseObject(doThrow = true) {
+            if (!heldObject) return;
+
+            const { body, mesh, origMass, origLinearDamp, origAngularDamp } = heldObject;
+
+            body.linearDamping  = origLinearDamp;
+            body.angularDamping = origAngularDamp;
+
+            if (doThrow) {
+                // Throw in camera look direction + camera velocity
+                camera.getWorldDirection(_camDir);
+                // Add camera velocity so walking while throwing feels correct
+                const throwVel = _camDir.clone().multiplyScalar(THROW_FORCE).add(_camVelocity.clone().multiplyScalar(2));
+                body.velocity.set(throwVel.x, throwVel.y, throwVel.z);
+            }
+
+            // Dim glow
+            if (mesh.material) {
+                mesh.material.emissiveIntensity = 0.12;
+            }
+
+            heldObject = null;
+            document.getElementById('hold-indicator').classList.remove('visible');
+            document.getElementById('crosshair-dot').className = '';
+        }
+
+        // Mouse down: grab
+        document.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            if (!controls.isLocked && document.getElementById('level-complete').style.display !== 'block') { controls.lock(); return; }
+            if (editorMode) return;
+            if (document.getElementById('level-complete').style.display === 'block') return;
+
+            if (heldObject) {
+                // already holding — release + throw
+                releaseObject(true);
+                return;
+            }
+
+            raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+            const hits = raycaster.intersectObjects(meshes);
+            if (hits.length > 0 && hits[0].distance <= MAX_GRAB_RANGE) {
+                grabObject(hits[0].object);
+            }
+            if (e.button !== 0) return;
+            if (!controls.isLocked) return;
+            if (!heldObject) return;
+        });
+
+        document.addEventListener('wheel', e => {
+            if (!heldObject) return;
+            holdDistance = Math.max(HOLD_DIST_MIN, Math.min(HOLD_DIST_MAX,
+                holdDistance - e.deltaY * 0.005));
+        });
+
+        // ─── MULTIPLAYER LOGIC ────────────────────────────────────
+        let peer = null;
+        let connections = [];
+
+        function showNotification(text) {
+            const container = document.getElementById('notifications');
+            const div = document.createElement('div');
+            div.className = 'notif';
+            div.textContent = `> ${text}`;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        function initPeer(id = null) {
+            document.getElementById('net-status').textContent = 'CONNECTING...';
+            document.getElementById('net-status').style.color = '#ffff00';
+            peer = id ? new Peer(id) : new Peer();
+            peer.on('open', myId => {
+                document.getElementById('net-status').textContent = 'ONLINE';
+                document.getElementById('net-status').style.color = '#00ff00';
+                document.getElementById('my-id').textContent = myId;
+                document.getElementById('my-id-display').style.display = 'block';
+                showNotification(`NETWORK READY: ${myId}`);
+            });
+            peer.on('connection', conn => setupConn(conn));
+            peer.on('error', err => {
+                console.error(err);
+                document.getElementById('net-status').textContent = 'ERROR';
+                document.getElementById('net-status').style.color = '#ff0000';
+                showNotification(`NET ERROR: ${err.type}`);
+            });
+        }
+
+        function setupConn(conn) {
+            connections.push(conn);
+            conn.on('data', data => {
+                if (data.type === 'move') {
+                    let p = otherPlayers.get(conn.peer);
+                    if (!p) {
+                        p = createPlayerModel(conn.peer);
+                        scene.add(p);
+                        otherPlayers.set(conn.peer, p);
+                        showNotification(`PLAYER JOINED: ${conn.peer.slice(0,6)}...`);
+                    }
+                    p.position.set(data.pos.x, data.pos.y - 0.5, data.pos.z);
+                    p.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
+                }
+                if (data.type === 'sync-obj' && data.idx < bodies.length) {
+                    const b = bodies[data.idx];
+                    // Only sync if we aren't the one currently holding it
+                    if (!heldObject || heldObject.body !== b) {
+                        b.position.set(data.pos.x, data.pos.y, data.pos.z);
+                        b.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
+                        b.velocity.set(0,0,0);
+                        b.angularVelocity.set(0,0,0);
+                    }
+                }
+                if (data.type === 'level-change' && data.num !== currentLevel) {
+                    loadLevel(data.num);
+                }
+                if (data.type === 'chat') {
+                    addChatMessage(data.sender, data.msg);
+                }
+            });
+            
+            conn.on('close', () => {
+                const p = otherPlayers.get(conn.peer);
+                if (p) {
+                    scene.remove(p);
+                    otherPlayers.delete(conn.peer);
+                    showNotification(`PLAYER LEFT: ${conn.peer.slice(0,6)}...`);
+                }
+                connections = connections.filter(c => c !== conn);
+            });
+
+            // Send initial state to new player
+            if (peer) conn.send({ type: 'level', num: currentLevel });
+        }
+
+        document.getElementById('btn-host').addEventListener('click', () => initPeer());
+        document.getElementById('btn-connect').addEventListener('click', () => {
+            if (!peer) initPeer();
+            const friendId = document.getElementById('peer-id-input').value;
+            if (friendId) setupConn(peer.connect(friendId));
+        });
+
+        function broadcastPos() {
+            if (!peer || connections.length === 0) return;
+            const data = {
+                type: 'move',
+                pos: camera.position,
+                quat: camera.quaternion
+            };
+            connections.forEach(c => c.send(data));
+
+            // Sync held object
+            if (heldObject) {
+                const syncData = {
+                    type: 'sync-obj',
+                    idx: bodies.indexOf(heldObject.body),
+                    pos: heldObject.body.position,
+                    quat: heldObject.body.quaternion
+                };
+                connections.forEach(c => c.send(syncData));
+            }
+        }
+
+        // ─── CHAT LOGIC ───────────────────────────────────────────
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+
+        function addChatMessage(sender, msg) {
+            const div = document.createElement('div');
+            const cleanMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            div.innerHTML = `<span style="color:#ffaa00">[${sender}]</span> ${cleanMsg}`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendChat() {
+            const msg = chatInput.value.trim();
+            if (!msg) return;
+            const senderId = peer ? peer.id.slice(0, 4).toUpperCase() : "USR";
+            const data = { type: 'chat', msg, sender: senderId };
+            connections.forEach(c => c.send(data));
+            addChatMessage('YOU', msg);
+            chatInput.value = '';
+            chatInput.blur();
+            controls.lock();
+        }
+
+        chatInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') sendChat();
+            e.stopPropagation(); 
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !chatInput.matches(':focus') && !editorMode) {
+                chatInput.focus();
+                controls.unlock();
+                e.preventDefault();
+            }
+        });
+
+        document.getElementById('add-box').addEventListener('click', () =>
+            addDynamicObject(new THREE.BoxGeometry(1,1,1), new THREE.Vector3(0,3,-3), currentMass));
+        document.getElementById('add-large-box').addEventListener('click', () =>
+            addDynamicObject(new THREE.BoxGeometry(2,2,2), new THREE.Vector3(0,4,-3), currentMass * 4));
+        document.getElementById('add-sphere').addEventListener('click', () =>
+            addDynamicObject(new THREE.SphereGeometry(0.6, 32, 32), new THREE.Vector3(0,3,-3), currentMass));
+        document.getElementById('add-cylinder').addEventListener('click', () =>
+            addDynamicObject(new THREE.CylinderGeometry(0.5,0.5,1.5,12), new THREE.Vector3(0,3,-3), currentMass));
+        document.getElementById('delete-last').addEventListener('click', () => {
+            if (meshes.length === 0) return;
+            if (heldObject && heldObject.mesh === meshes[meshes.length - 1]) releaseObject(false);
+            scene.remove(meshes.pop());
+            world.removeBody(bodies.pop());
+            updateLevelUI();
+        });
+        document.getElementById('clear-all').addEventListener('click', () => {
+            releaseObject(false);
+            for (let i = meshes.length - 1; i >= 0; i--) {
+                scene.remove(meshes[i]); world.removeBody(bodies[i]);
+            }
+            meshes.length = 0; bodies.length = 0; updateLevelUI();
+        });
+        document.getElementById('reset-level').addEventListener('click', () => loadLevel(currentLevel));
+        document.getElementById('gravity-slider').addEventListener('input', e => {
+            const val = parseFloat(e.target.value);
+            if (isNaN(val)) return;
+            world.gravity.y = -parseFloat(e.target.value);
+            document.getElementById('gravity-value').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+        document.getElementById('mass-slider').addEventListener('input', e => {
+            currentMass = parseFloat(e.target.value);
+            document.getElementById('mass-value').textContent = currentMass.toFixed(1);
+        });
+        document.getElementById('next-level').addEventListener('click', () => loadLevel(currentLevel + 1));
+        document.getElementById('retry-level').addEventListener('click', () => loadLevel(currentLevel));
+
+        // ─── ANIMATION LOOP ───────────────────────────────────────
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+
+            world.step(1 / 60, dt, 3);
+
+            // Sync and Level Check
+            let countOnPlate = 0;
+            for (let i = 0; i < meshes.length; i++) {
+                meshes[i].position.copy(bodies[i].position);
+                meshes[i].quaternion.copy(bodies[i].quaternion);
+                
+                const dX = Math.abs(bodies[i].position.x - plateMesh.position.x);
+                const dZ = Math.abs(bodies[i].position.z - plateMesh.position.z);
+                const dY = bodies[i].position.y - plateMesh.position.y;
+                if (dX < 2 && dZ < 2 && dY > 0 && dY < 1.5) {
+                    countOnPlate++;
+                }
+            }
+            
+            onPlateCount = countOnPlate;
+            const target = levels[currentLevel - 1].count;
+            const isTriggered = onPlateCount >= target;
+
+            // Plate Animation
+            const targetY = isTriggered ? plateBase.position.y : plateBase.position.y + 0.1;
+            plateMesh.position.y = THREE.MathUtils.lerp(plateMesh.position.y, targetY, 0.2);
+            plateMesh.material.emissiveIntensity = isTriggered ? 2.0 : 0.5;
+            plateMesh.material.color.setHex(isTriggered ? 0x00ff00 : 0xff0000);
+            document.getElementById('door-indicator').style.background = isTriggered ? '#0f0' : '#300';
+            document.getElementById('door-indicator').style.boxShadow = isTriggered ? '0 0 15px #0f0' : 'none';
+
+            // Door Animation logic
+            if (doorMesh) {
+                doorTargetY = isTriggered ? 10 : 3.5;
+                doorMesh.position.y = THREE.MathUtils.lerp(doorMesh.position.y, doorTargetY, 0.05);
+                doorBody.position.y = doorMesh.position.y;
+            }
+
+            if (isTriggered && levelActive) {
+                if (currentLevel === 6) {
+                    plateTime += dt;
+                    document.getElementById('progress').textContent = `Holding: ${plateTime.toFixed(1)}s / 3.0s`;
+                    if (plateTime >= 3.0) completeLevel();
+                } else {
+                    completeLevel();
+                }
+            }
+
+            _camVelocity.copy(camera.position).sub(_prevCamPos).divideScalar(dt);
+            _prevCamPos.copy(camera.position);
+            broadcastPos();
+
+            if (controls.isLocked && !editorMode) {
+                // Movement
+                const speed = 4 * dt;
+                if (moveForward)  controls.moveForward(speed);
+                if (moveBackward) controls.moveForward(-speed);
+                if (moveLeft)     controls.moveRight(-speed);
+                if (moveRight)    controls.moveRight(speed);
+
+                // ── PORTAL-STYLE SPRING HOLD ──────────────────────
+                if (heldObject) {
+                    camera.getWorldDirection(_camDir);
+
+                    // Target = camera + look * distance, slightly above center
+                    _targetPos.copy(camera.position)
+                        .addScaledVector(_camDir, holdDistance);
+                    _targetPos.y += 0.05; // tiny upward bias keeps objects from clipping floor
+
+                    const body = heldObject.body;
+
+                    // Displacement from current position to target
+                    _delta.set(
+                        _targetPos.x - body.position.x,
+                        _targetPos.y - body.position.y,
+                        _targetPos.z - body.position.z
+                    );
+
+                    // Spring force: F = k*x  (restoring)  −  d*v  (damping)
+                    const fx = SPRING_STIFFNESS * _delta.x - SPRING_DAMPING * body.velocity.x;
+                    const fy = SPRING_STIFFNESS * _delta.y - SPRING_DAMPING * body.velocity.y + 9.8 * body.mass; // counteract gravity
+                    const fz = SPRING_STIFFNESS * _delta.z - SPRING_DAMPING * body.velocity.z;
+
+                    _force.set(fx, fy, fz);
+                    body.applyForce(_force);
+
+                    // Gently zero angular velocity so object doesn't spin uncontrollably
+                    body.angularVelocity.set(
+                        body.angularVelocity.x * 0.7,
+                        body.angularVelocity.y * 0.7,
+                        body.angularVelocity.z * 0.7
+                    );
+
+                    // Pulse glow
+                    const pulse = 0.4 + Math.sin(Date.now() * 0.005) * 0.15;
+                    if (heldObject.mesh.material)
+                        heldObject.mesh.material.emissiveIntensity = pulse;
+                }
+
+                // ── CROSSHAIR AIM DETECTION ────────────────────────
+                if (!heldObject) {
+                    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+                    const hits = raycaster.intersectObjects(meshes);
+                    isLooking = hits.length > 0 && hits[0].distance <= MAX_GRAB_RANGE;
+                    document.getElementById('crosshair-dot').className = isLooking ? 'aim' : '';
+                }
+            }
+
+            updateHUD();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        });
+
+        animate();
+        loadLevel(1);
+    </script>
+</body>
+</html>
