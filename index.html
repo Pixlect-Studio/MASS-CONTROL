@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASS-CONTROL // Physics Test</title>
     <script src="https://cdn.jsdelivr.net/gh/exitgames/photon-javascript-sdk@master/dist/Photon-Javascript_SDK.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #crosshair {
@@ -120,18 +124,18 @@
             z-index: 50; box-shadow: 0 0 10px #ff000033;
         }
         #chat-container {
-            position: absolute; bottom: 150px; left: 20px;
-            width: 280px; height: 160px;
+            position: absolute; bottom: 30px; left: 20px;
+            width: 30px; height: 30px;
             background: rgba(0,0,0,0.8); border: 1px solid #00ffff33;
             display: flex; flex-direction: column;
             pointer-events: auto; z-index: 151;
-            font-family: monospace; font-size: 11px;
+            font-family: monospace; font-size: 8px;
         }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 8px; color: #00ffff; }
-        #chat-messages div { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 2px; color: #00ffff; }
+        #chat-messages div { margin-bottom: 2px; line-height: 1.2; word-break: break-all; }
         #chat-input {
             background: #050505; border: none; border-top: 1px solid #00ffff33;
-            color: #00ffff; padding: 8px; font-family: monospace; outline: none;
+            color: #00ffff; padding: 2px; font-family: monospace; outline: none;
         }
         #notifications {
             position: absolute; bottom: 80px; left: 20px;
@@ -153,15 +157,29 @@
 </head>
 <body>
 
+    </style>
+</head>
+<body>
+
+    <div id="mode-selector" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); padding:10px; border:1px solid #00ff00; z-index:200;">
+        <button id="single-player" style="background:#00ff0022; color:#00ff00; border:1px solid #00ff00; padding:8px 12px; margin:0 5px; cursor:pointer;">Single Player</button>
+        <button id="multiplayer" style="background:#00ff0022; color:#00ff00; border:1px solid #00ff00; padding:8px 12px; margin:0 5px; cursor:pointer;">Multiplayer</button>
+    </div>
+
     <div id="crosshair"></div>
     <div id="crosshair-dot"></div>
     <div id="hold-indicator">[ HOLDING — SCROLL TO ADJUST DISTANCE ]</div>
     <div id="door-indicator"></div>
 
-    <div id="chat-container">
+    <div id="chat-container" style="display:none;">
+        <div id="chat-header" style="display:flex; justify-content:flex-end; padding:2px;">
+            <button id="chat-close" style="background:none; border:none; color:#00ffff; cursor:pointer; font-size:10px;">×</button>
+        </div>
         <div id="chat-messages"></div>
         <input type="text" id="chat-input" placeholder="PRESS ENTER TO CHAT..." autocomplete="off">
     </div>
+
+    <button id="chat-toggle" style="position:absolute; bottom:60px; left:20px; background:rgba(0,0,0,0.8); color:#00ffff; border:1px solid #00ffff; padding:4px 8px; cursor:pointer; font-family:monospace; font-size:10px; display:none;">CHAT</button>
 
     <div id="notifications"></div>
 
@@ -256,6 +274,50 @@
             { name: "05: ELEVATION", objective: "High ground plate", count: 1, gravity: 5, reward: 500, description: "Low gravity test. Get the cube to the ledge." },
             { name: "06: STABILITY", objective: "Hold for 3 seconds", count: 3, gravity: 9.8, reward: 1000, description: "Final test: Keep all objects on the plate." }
         ];
+
+        let gameMode = null;
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrhgWrgdhGb4z3w91bOXDb-LWlLYDEw7A",
+            authDomain: "mass-control.firebaseapp.com",
+            projectId: "mass-control",
+            storageBucket: "mass-control.firebasestorage.app",
+            messagingSenderId: "946293545012",
+            appId: "1:946293545012:web:e969923b7f7574e3dc5261",
+            measurementId: "G-Z48ND9ZNPB"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const messagesCollection = db.collection("chat_messages");
+
+        // Mode selection
+        document.getElementById('single-player').addEventListener('click', () => {
+            gameMode = 'single';
+            document.getElementById('mode-selector').style.display = 'none';
+            document.getElementById('multiplayer-ui').style.display = 'none';
+            document.getElementById('chat-toggle').style.display = 'none';
+            // Game starts normally
+        });
+
+        document.getElementById('multiplayer').addEventListener('click', () => {
+            gameMode = 'multiplayer';
+            document.getElementById('mode-selector').style.display = 'none';
+            document.getElementById('multiplayer-ui').style.display = 'block';
+            document.getElementById('chat-toggle').style.display = 'block';
+            // Game starts with multiplayer features
+        });
+
+        // Chat toggle
+        document.getElementById('chat-toggle').addEventListener('click', () => {
+            document.getElementById('chat-container').style.display = 'flex';
+            document.getElementById('chat-toggle').style.display = 'none';
+        });
+
+        document.getElementById('chat-close').addEventListener('click', () => {
+            document.getElementById('chat-container').style.display = 'none';
+            document.getElementById('chat-toggle').style.display = 'block';
+        });
 
         // ─── PHYSICS WORLD ────────────────────────────────────────
         const world = new CANNON.World();
@@ -492,6 +554,19 @@
             // Add some obstacles for later levels
             if (num >= 4) makeWall(4, 8, 4, 5, 4, -8, 0x333333);
 
+            // Add door for level 2
+            if (num === 2) {
+                const door = makeWall(4, 8, 0.5, 0, 3.5, -10, 0x333333);
+                doorMesh = door.mesh;
+                doorBody = door.body;
+            }
+
+            // Adjust plate height for level 5
+            if (num === 5) {
+                plateMesh.position.y = 3;
+                plateBase.position.y = 2.9;
+            }
+
             document.getElementById('level-complete').style.display = 'none';
             updateLevelUI();
         }
@@ -712,8 +787,7 @@
         const EV = {
             MOVE: 1,
             SYNC_OBJ: 2,
-            LEVEL_CHANGE: 3,
-            CHAT: 4
+            LEVEL_CHANGE: 3
         };
 
         function showNotification(text) {
@@ -769,7 +843,6 @@
                     }
                 }
                 if (code === EV.LEVEL_CHANGE) loadLevel(content.level);
-                if (code === EV.CHAT) addChatMessage(content.sender, content.msg);
             };
 
             photonClient.connectToRegionMaster("EU"); // Change region if needed
@@ -811,25 +884,42 @@
         const chatInput = document.getElementById('chat-input');
         const chatMessages = document.getElementById('chat-messages');
 
-        function addChatMessage(sender, msg) {
+        function addChatMessage(sender, msg, time) {
             const div = document.createElement('div');
             const cleanMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            div.innerHTML = `<span style="color:#ffaa00">[${sender}]</span> ${cleanMsg}`;
+            const timeStr = time ? new Date(time.toDate()).toLocaleTimeString() : 'now';
+            div.innerHTML = `<span style="color:#ffaa00">[${sender}]</span> (${timeStr}): ${cleanMsg}`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        // Listen for Firebase messages
+        messagesCollection.orderBy("timestamp").onSnapshot((snapshot) => {
+            chatMessages.innerHTML = '';
+            snapshot.forEach((doc) => {
+                const message = doc.data();
+                const sender = message.user || "Unknown";
+                addChatMessage(sender, message.text, message.timestamp);
+            });
+        }, (error) => {
+            console.error("Error getting messages: ", error);
+        });
+
         function sendChat() {
             const msg = chatInput.value.trim();
             if (!msg) return;
-            const sender = photonClient ? photonClient.myActor().actorNr : "USR";
-            if (photonClient && photonClient.isJoinedToRoom()) {
-                photonClient.raiseEvent(EV.CHAT, { msg, sender });
+            try {
+                messagesCollection.add({
+                    text: msg,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: "Player"
+                });
+                chatInput.value = '';
+                chatInput.blur();
+                controls.lock();
+            } catch (e) {
+                console.error("Error sending message: ", e);
             }
-            addChatMessage('YOU', msg);
-            chatInput.value = '';
-            chatInput.blur();
-            controls.lock();
         }
 
         chatInput.addEventListener('keydown', e => {
