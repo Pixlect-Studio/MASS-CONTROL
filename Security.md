@@ -32,7 +32,7 @@ Do NOT attempt to access or modify data that does not belong to you
 
 This policy applies only to the official version of Mass Control hosted at:
 
-👉 https://pixlect-studio.github.io/Mass-Control/
+👉 https://pixlect-studio.github.io/MASS-CONTROL/
 
 ❌ Out of Scope
 Modified or unofficial copies of the project
