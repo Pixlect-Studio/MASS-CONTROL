@@ -3,7 +3,7 @@ Security Policy
 
 Mass Control is a live web project. Security updates are applied directly to the latest version hosted on the official website:
 
-👉 https://pixlect-studio.github.io/Mass-Control/
+👉 https://pixlect-studio.github.io/MASS-CONTROL/
 
 Only the current live version is supported. Older or unofficial copies are not maintained and may be insecure.
 
