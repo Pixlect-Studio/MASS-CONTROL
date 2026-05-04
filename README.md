@@ -4,7 +4,7 @@ Mass Control is a web-based project by Pixlect Studio featuring an embedded game
 
 🌐 Play Now
 
-👉 https://pixlect-studio.github.io/Mass-Control/
+👉 https://pixlect-studio.github.io/MASS-CONTROL/
 
 💻 Platform
 Designed for laptop/desktop use
