@@ -9,4 +9,4 @@ No part of this project may be copied, modified, distributed, republished, downl
 Unauthorized use of this project, including its code or assets, is strictly prohibited and may result in legal action.
 
 Permission is granted solely to access and play the project through its official website:
-https://pixlect-studio.github.io/Mass-Control/
+https://pixlect-studio.github.io/MASS-CONTROL/
