@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MASS-CONTROL // Physics Test</title>
-    <script src="https://cdn.jsdelivr.net/gh/exitgames/photon-javascript-sdk@master/dist/Photon-Javascript_SDK.min.js"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #crosshair {
@@ -112,76 +108,49 @@
         #editor-panel label { display: block; margin: 8px 0 3px; color: #aaaaaa; font-size: 10px; letter-spacing: 1px; }
         #editor-panel input[type=range] { width: 100%; margin-bottom: 8px; accent-color: #00ff00; }
 
-        #multiplayer-ui {
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(0,0,0,0.8); color: #00ff00;
-            padding: 10px; font-family: monospace; font-size: 10px;
-            border: 1px solid #00ff0033; z-index: 101;
+        #peer-panel {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.9); color: #00ff00;
+            border: 1px solid #00ff0066; padding: 14px;
+            width: 280px; pointer-events: auto; z-index: 110;
+            font-family: monospace; font-size: 12px;
         }
+        #peer-panel h3 { margin: 0 0 10px 0; letter-spacing: 2px; color: #00ffff; }
+        #peer-panel div, #peer-panel label { margin-bottom: 6px; }
+        #peer-panel input { width: 100%; padding: 6px 8px; margin-top: 4px; background: #111; border: 1px solid #00ff0055; color: #00ff00; font-family: monospace; }
+        #peer-panel button { width: 100%; background: transparent; color: #00ff00; border: 1px solid #00ff0066; padding: 8px; cursor: pointer; }
+        #peer-panel button:hover { background: #00ff00; color: #000; }
+        #peer-panel .status { font-size: 11px; color: #aaa; }
+
+        #chat-container {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 300px; max-height: 320px;
+            background: rgba(0,0,0,0.9); border: 1px solid #00ffff33;
+            display: none; flex-direction: column;
+            pointer-events: auto; z-index: 120;
+            font-family: monospace; font-size: 11px;
+        }
+        #chat-container.open { display: flex; }
+        #chat-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid #00ffff33; }
+        #chat-header span { color: #00ffff; font-size: 11px; }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 8px; color: #00ffff; }
+        #chat-messages div { margin-bottom: 6px; line-height: 1.3; word-break: break-word; }
+        #chat-input { width: 100%; box-sizing: border-box; border: none; border-top: 1px solid #00ffff33; background: #050505; color: #00ffff; padding: 8px; outline: none; }
+        #chat-toggle { position: absolute; bottom: 360px; left: 20px; background: rgba(0,0,0,0.9); color: #00ffff; border: 1px solid #00ffff; padding: 6px 10px; cursor: pointer; font-family: monospace; font-size: 11px; display: none; z-index: 121; }
+
         #door-indicator {
             position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
             width: 60px; height: 10px; background: #300; border: 2px solid #111;
             z-index: 50; box-shadow: 0 0 10px #ff000033;
         }
-        #chat-container {
-            position: absolute; bottom: 120px; left: 20px;
-            width: 150px; height: 150px;
-            background: rgba(0,0,0,0.8); border: 1px solid #00ffff33;
-            display: flex; flex-direction: column;
-            pointer-events: auto; z-index: 151;
-            font-family: monospace; font-size: 8px;
-        }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 2px; color: #00ffff; }
-        #chat-messages div { margin-bottom: 2px; line-height: 1.2; word-break: break-all; }
-        #chat-input {
-            background: #050505; border: none; border-top: 1px solid #00ffff33;
-            color: #00ffff; padding: 2px; font-family: monospace; outline: none;
-        }
-        #notifications {
-            position: absolute; bottom: 80px; left: 20px;
-            z-index: 150; font-family: monospace;
-            pointer-events: none;
-        }
-        .notif {
-            background: rgba(0,255,255,0.1); color: #00ffff;
-            padding: 5px 10px; margin-top: 5px; border-left: 3px solid #00ffff;
-            font-size: 11px; animation: fadeout 5s forwards;
-        }
-        @keyframes fadeout { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-        #multiplayer-ui input { 
-            background: #111; border: 1px solid #00ff0055; color: #00ff00; 
-            padding: 4px; width: 120px; margin-top: 5px; font-family: monospace;
-        }
-        #multiplayer-ui button { background: #00ff0022; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; padding: 4px 8px; }
     </style>
 </head>
 <body>
-
-    </style>
-</head>
-<body>
-
-    <div id="mode-selector" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); padding:10px; border:1px solid #00ff00; z-index:200;">
-        <button id="single-player" style="background:#00ff0022; color:#00ff00; border:1px solid #00ff00; padding:8px 12px; margin:0 5px; cursor:pointer;">Single Player</button>
-        <button id="multiplayer" style="background:#00ff0022; color:#00ff00; border:1px solid #00ff00; padding:8px 12px; margin:0 5px; cursor:pointer;">Multiplayer</button>
-    </div>
 
     <div id="crosshair"></div>
     <div id="crosshair-dot"></div>
     <div id="hold-indicator">[ HOLDING — SCROLL TO ADJUST DISTANCE ]</div>
     <div id="door-indicator"></div>
-
-    <div id="chat-container" style="display:none;">
-        <div id="chat-header" style="display:flex; justify-content:flex-end; padding:2px;">
-            <button id="chat-close" style="background:none; border:none; color:#00ffff; cursor:pointer; font-size:10px;">×</button>
-        </div>
-        <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="PRESS ENTER TO CHAT..." autocomplete="off">
-    </div>
-
-    <button id="chat-toggle" style="position:absolute; bottom:60px; left:20px; background:rgba(0,0,0,0.8); color:#00ffff; border:1px solid #00ffff; padding:4px 8px; cursor:pointer; font-family:monospace; font-size:10px; display:none;">CHAT</button>
-
-    <div id="notifications"></div>
 
     <div id="debug-panel">
         <div><span class="dl">STATE </span><span class="dv" id="debug-state">IDLE</span></div>
@@ -193,23 +162,30 @@
     <div id="rank-panel">
         <div>RANK: <span id="rank">TRAINEE</span></div>
         <div>SCORE: <span id="score">0</span></div>
-        <div>LEVEL: <span id="current-level">1</span>/6</div>
+        <div>MODE: <span id="current-level">FUN</span></div>
         <div>TIME: <span id="timer">0s</span></div>
     </div>
 
-    <div id="multiplayer-ui">
-        <div>NETWORK: <span id="net-status" style="color: #ff5555;">OFFLINE</span></div>
-        <input type="text" id="appid-input" value="759dd758-56a5-44f2-9cb3-1b38c9f65a3f" style="width: 180px;">
-        <div id="room-info" style="display:none; margin-top:5px;">ROOM: <span id="room-name" style="color:#00ffff;">...</span></div>
-        <input type="text" id="room-input" placeholder="ROOM NAME">
-        <button id="btn-join">JOIN ROOM</button>
-        <button id="btn-host">GO ONLINE</button>
+    <div id="peer-panel">
+        <h3>// MULTIPLAYER</h3>
+        <div>ID: <span id="peer-id">...</span></div>
+        <label for="friend-id">Friend ID</label>
+        <input type="text" id="friend-id" placeholder="Enter friend ID">
+        <button id="connect-peer">CONNECT</button>
+        <div class="status">Status: <span id="peer-status">DISCONNECTED</span></div>
+    </div>
+
+    <button id="chat-toggle">CHAT</button>
+    <div id="chat-container">
+        <div id="chat-header"><span>Peer Chat</span><button id="chat-close" style="background:none;border:none;color:#00ffff;cursor:pointer;font-size:12px;">×</button></div>
+        <div id="chat-messages"></div>
+        <input type="text" id="chat-input" placeholder="Type message and press enter..." autocomplete="off">
     </div>
 
     <div id="level-panel">
-        <h3>LEVEL <span id="level-number">1</span></h3>
-        <div id="objective">Loading...</div>
-        <div id="progress">Progress: 0/1</div>
+        <h3>SANDBOX</h3>
+        <div id="objective">Spawn blocks, bounce them, and cause a physics overload.</div>
+        <div id="progress">OBJECTS: 0</div>
     </div>
 
     <div id="ui">
@@ -220,8 +196,6 @@
         <h2>LEVEL COMPLETE</h2>
         <p id="completion-text">Well done!</p>
         <p>Score: <span id="final-score">0</span> &nbsp;|&nbsp; Time: <span id="final-time">0s</span></p>
-        <button id="next-level">NEXT LEVEL →</button>
-        <button id="retry-level">↺ RETRY</button>
     </div>
 
     <div id="editor-panel" style="display:none;">
@@ -258,67 +232,12 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
         // ─── GAME STATE ───────────────────────────────────────────
-        let currentLevel = 1;
         let totalScore = 0;
         let levelStartTime = Date.now();
-        let onPlateCount = 0;
-        let plateTime = 0;
         let levelActive = true;
         const ranks = ["TRAINEE", "CADET", "AGENT", "MASTER", "ELITE", "LEGEND"];
 
-        const levels = [
-            { name: "01: INITIATION", objective: "Activate the floor button", count: 1, gravity: 9.8, reward: 100, description: "Drop the cube onto the testing plate." },
-            { name: "02: OBSTRUCTION", objective: "Toss over the barrier", count: 1, gravity: 9.8, reward: 200, description: "The plate is behind the containment wall." },
-            { name: "03: MOMENTUM", objective: "Long distance delivery", count: 1, gravity: 9.8, reward: 300, description: "The sphere must stay on the distant plate." },
-            { name: "04: MULTIPLICITY", objective: "Double weight required", count: 2, gravity: 12, reward: 400, description: "Both cubes are required to trigger the circuit." },
-            { name: "05: ELEVATION", objective: "High ground plate", count: 1, gravity: 5, reward: 500, description: "Low gravity test. Get the cube to the ledge." },
-            { name: "06: STABILITY", objective: "Hold for 3 seconds", count: 3, gravity: 9.8, reward: 1000, description: "Final test: Keep all objects on the plate." }
-        ];
-
-        let gameMode = null;
-
-        // Firebase config
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDrhgWrgdhGb4z3w91bOXDb-LWlLYDEw7A",
-  authDomain: "mass-control.firebaseapp.com",
-  projectId: "mass-control",
-  storageBucket: "mass-control.firebasestorage.app",
-  messagingSenderId: "946293545012",
-  appId: "1:946293545012:web:e969923b7f7574e3dc5261",
-  measurementId: "G-Z48ND9ZNPB"
-};
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const messagesCollection = db.collection("chat_messages");
-
-        // Mode selection
-        document.getElementById('single-player').addEventListener('click', () => {
-            gameMode = 'single';
-            document.getElementById('mode-selector').style.display = 'none';
-            document.getElementById('multiplayer-ui').style.display = 'none';
-            document.getElementById('chat-toggle').style.display = 'none';
-            // Game starts normally
-        });
-
-        document.getElementById('multiplayer').addEventListener('click', () => {
-            gameMode = 'multiplayer';
-            document.getElementById('mode-selector').style.display = 'none';
-            document.getElementById('multiplayer-ui').style.display = 'block';
-            document.getElementById('chat-toggle').style.display = 'block';
-            // Game starts with multiplayer features
-        });
-
-        // Chat toggle
-        document.getElementById('chat-toggle').addEventListener('click', () => {
-            document.getElementById('chat-container').style.display = 'flex';
-            document.getElementById('chat-toggle').style.display = 'none';
-        });
-
-        document.getElementById('chat-close').addEventListener('click', () => {
-            document.getElementById('chat-container').style.display = 'none';
-            document.getElementById('chat-toggle').style.display = 'block';
-        });
+        // Sandbox mode starts immediately.
 
         // ─── PHYSICS WORLD ────────────────────────────────────────
         const world = new CANNON.World();
@@ -427,48 +346,6 @@ const firebaseConfig = {
         let currentMass = 1;
 
         const PALETTE = [0x00aaff, 0xff5555, 0x55ff88, 0xffaa00, 0xaa55ff, 0xff55bb];
-        
-        // Placeholder for other players
-        const otherPlayers = new Map();
-        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
-
-        function createPlayerTag(text) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 256; canvas.height = 64;
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.fillRect(0, 0, 256, 64);
-            ctx.font = 'bold 32px monospace';
-            ctx.fillStyle = '#00ffff';
-            ctx.textAlign = 'center';
-            ctx.fillText(text, 128, 45);
-            const tex = new THREE.CanvasTexture(canvas);
-            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
-            sprite.scale.set(1.5, 0.375, 1);
-            sprite.position.y = 1.4;
-            return sprite;
-        }
-
-        function createPlayerModel(id) {
-            const group = new THREE.Group();
-            // Torso
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), playerMaterial);
-            group.add(body);
-            // Head
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), playerMaterial);
-            head.position.y = 0.65;
-            group.add(head);
-            // Visor
-            const visor = new THREE.Mesh(
-                new THREE.BoxGeometry(0.3, 0.1, 0.1),
-                new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 1 })
-            );
-            visor.position.set(0, 0.7, -0.18);
-            group.add(visor);
-            // Tag
-            group.add(createPlayerTag(id.slice(0, 6).toUpperCase()));
-            return group;
-        }
 
         function addDynamicObject(geometry, position, mass, colorHex) {
             const col = colorHex ?? PALETTE[meshes.length % PALETTE.length];
@@ -504,18 +381,11 @@ const firebaseConfig = {
         }
 
         // ─── LEVEL LOADING ────────────────────────────────────────
-        let doorMesh = null, doorBody = null;
-        let doorTargetY = 3.5;
-
-        function loadLevel(num) {
-            currentLevel = num;
-            onPlateCount = 0;
-            plateTime = 0;
+        function resetSandbox() {
             levelActive = true;
             levelStartTime = Date.now();
             releaseObject(); // drop anything held
 
-            // Cleanup Dynamic Objects
             for (let i = meshes.length - 1; i >= 0; i--) {
                 scene.remove(meshes[i]);
                 world.removeBody(bodies[i]);
@@ -523,60 +393,19 @@ const firebaseConfig = {
             meshes.length = 0;
             bodies.length = 0;
 
-            // Cleanup Level-Specific Walls and Doors
-            for (const w of extraWalls) {
-                if (w.mesh) scene.remove(w.mesh);
-                if (w.body) world.removeBody(w.body);
-            }
-            extraWalls.length = 0;
-            doorMesh = null;
-            doorBody = null;
-
-            const lv = levels[num - 1];
-            world.gravity.y = -lv.gravity;
-
-            const cols = [0x00aaff, 0xff5544, 0x44ffaa, 0xffcc00, 0xaa44ff];
-            for (let i = 0; i < lv.count; i++) {
-                const isSphereLevel = num === 3;
-                const isSphere = isSphereLevel;
-                let pos;
-                if (lv.count === 1)      pos = new THREE.Vector3(0, 2, -2);
-                else if (lv.count === 2) pos = new THREE.Vector3((i - 0.5) * 4, 2, -6);
-                else                     pos = new THREE.Vector3((i - 1) * 3, 2 + i * 0.3, -5 - i * 0.5);
-
-                if (isSphere) {
-                    addDynamicObject(new THREE.SphereGeometry(0.55, 32, 32), pos, 1, cols[i]);
-                } else {
-                    const sz = num === 5 ? 1.4 : 1;
-                    addDynamicObject(new THREE.BoxGeometry(sz, sz, sz), pos, num === 5 ? 5 : 1, cols[i]);
-                }
-            }
-
-            // Add some obstacles for later levels
-            if (num >= 4) makeWall(4, 8, 4, 5, 4, -8, 0x333333);
-
-            // Add door for level 2
-            if (num === 2) {
-                const door = makeWall(4, 8, 0.5, 0, 3.5, -10, 0x333333);
-                doorMesh = door.mesh;
-                doorBody = door.body;
-            }
-
-            // Adjust plate height for level 5
-            if (num === 5) {
-                plateMesh.position.y = 3;
-                plateBase.position.y = 2.9;
-            }
+            addDynamicObject(new THREE.BoxGeometry(1, 1, 1), new THREE.Vector3(0, 3, -3), 1);
+            addDynamicObject(new THREE.SphereGeometry(0.75, 32, 32), new THREE.Vector3(2, 4, -2), 1);
+            addDynamicObject(new THREE.BoxGeometry(1.5, 0.5, 1.5), new THREE.Vector3(-2, 4, -2), 2);
+            addDynamicObject(new THREE.CylinderGeometry(0.5, 0.5, 1.5, 12), new THREE.Vector3(0, 5, -5), 1.5);
 
             document.getElementById('level-complete').style.display = 'none';
             updateLevelUI();
         }
 
         function updateLevelUI() {
-            const lv = levels[currentLevel - 1];
-            document.getElementById('level-number').textContent = currentLevel;
-            document.getElementById('progress').textContent = `Pressure Plate: ${onPlateCount}/${lv.count}`;
-            document.getElementById('current-level').textContent = currentLevel;
+            document.getElementById('level-number').textContent = 'SANDBOX';
+            document.getElementById('progress').textContent = `OBJECTS: ${meshes.length}`;
+            document.getElementById('current-level').textContent = 'FUN';
             document.getElementById('debug-objects').textContent = meshes.length;
             document.getElementById('object-count').textContent = 'OBJECTS: ' + meshes.length;
         }
@@ -605,32 +434,16 @@ const firebaseConfig = {
         }
 
         function completeLevel() {
-            if (!levelActive) return;
-            levelActive = false;
-            if (photonClient && photonClient.isJoinedToRoom()) {
-                photonClient.raiseEvent(3, { level: currentLevel + 1 }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.All });
-            }
-
-            const lv = levels[currentLevel - 1];
-            const t = Math.floor((Date.now() - levelStartTime) / 1000);
-            const bonus = Math.max(0, 300 - t * 10);
-            const s = lv.reward + bonus;
-            totalScore += s;
-
-            document.getElementById('completion-text').textContent =
-                currentLevel < 6 ? `Level ${currentLevel} cleared!` : '✦ GAME COMPLETE — YOU ARE LEGEND ✦';
-            document.getElementById('final-score').textContent = s;
-            document.getElementById('final-time').textContent = t + 's';
-            document.getElementById('next-level').style.display = currentLevel < 6 ? 'inline-block' : 'none';
-            document.getElementById('level-complete').style.display = 'block';
+            // No level completion in sandbox. Keep the physics chaos flowing.
         }
 
         // ─── CONTROLS ────────────────────────────────────────────
         const controls = new PointerLockControls(camera, document.body);
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 
-        document.addEventListener('click', () => {
-            if (!editorMode && document.getElementById('level-complete').style.display !== 'block')
+        document.addEventListener('click', e => {
+            if (editorMode || e.target.closest('#editor-panel')) return;
+            if (document.getElementById('level-complete').style.display !== 'block')
                 if (!controls.isLocked) controls.lock();
         });
 
@@ -755,8 +568,8 @@ const firebaseConfig = {
         // Mouse down: grab
         document.addEventListener('mousedown', e => {
             if (e.button !== 0) return;
+            if (editorMode || e.target.closest('#editor-panel')) return;
             if (!controls.isLocked && document.getElementById('level-complete').style.display !== 'block') { controls.lock(); return; }
-            if (editorMode) return;
             if (document.getElementById('level-complete').style.display === 'block') return;
 
             if (heldObject) {
@@ -781,160 +594,159 @@ const firebaseConfig = {
                 holdDistance - e.deltaY * 0.005));
         });
 
-        // ─── MULTIPLAYER LOGIC ────────────────────────────────────
-        let photonClient = null;
-        let currentRoom = null;
+        // ─── PEERJS MULTIPLAYER ───────────────────────────────────
+        let peer = null;
+        let conn = null;
+        let remotePlayer = null;
+        let lastSentTime = 0;
+        let lastSentPosition = new THREE.Vector3();
+        let lastSentQuaternion = new THREE.Quaternion();
 
-        const EV = {
-            MOVE: 1,
-            SYNC_OBJ: 2,
-            LEVEL_CHANGE: 3
-        };
-
-        function showNotification(text) {
-            const container = document.getElementById('notifications');
-            const div = document.createElement('div');
-            div.className = 'notif';
-            div.textContent = `> ${text}`;
-            container.appendChild(div);
-            setTimeout(() => div.remove(), 5000);
+        function setPeerStatus(text, color = '#00ff00') {
+            const status = document.getElementById('peer-status');
+            status.textContent = text;
+            status.style.color = color;
+            document.getElementById('chat-toggle').style.display = conn && conn.open ? 'inline-block' : 'none';
         }
 
-        function initPhoton(appId, roomName = "lobby") {
-            photonClient = new Photon.LoadBalancing.LoadBalancingClient(Photon.ConnectionProtocol.Wss, appId, "1.0");
-            
-            photonClient.onStateChange = (state) => {
-                const status = document.getElementById('net-status');
-                if (state === Photon.LoadBalancing.ClientState.Joined) {
-                    status.textContent = 'ONLINE'; status.style.color = '#00ff00';
-                    document.getElementById('appid-input').style.display = 'none';
-                    document.getElementById('room-name').textContent = photonClient.myRoom().name;
-                    document.getElementById('room-info').style.display = 'block';
-                    showNotification(`JOINED ROOM: ${photonClient.myRoom().name}`);
-                }
-            };
-
-            photonClient.onActorJoin = (actor) => {
-                if (actor.actorNr === photonClient.myActor().actorNr) return;
-                const p = createPlayerModel(actor.actorNr.toString());
-                scene.add(p);
-                otherPlayers.set(actor.actorNr, p);
-                showNotification(`PLAYER JOINED: ${actor.actorNr}`);
-            };
-
-            photonClient.onActorLeave = (actor) => {
-                const p = otherPlayers.get(actor.actorNr);
-                if (p) { scene.remove(p); otherPlayers.delete(actor.actorNr); }
-                showNotification(`PLAYER LEFT: ${actor.actorNr}`);
-            };
-
-            photonClient.onEvent = (code, content, actorNr) => {
-                if (code === EV.MOVE) {
-                    const p = otherPlayers.get(actorNr);
-                    if (p) {
-                        p.position.set(content.pos.x, content.pos.y - 0.5, content.pos.z);
-                        p.quaternion.set(content.quat.x, content.quat.y, content.quat.z, content.quat.w);
-                    }
-                }
-                if (code === EV.SYNC_OBJ && content.idx < bodies.length) {
-                    const b = bodies[content.idx];
-                    if (!heldObject || bodies.indexOf(heldObject.body) !== content.idx) {
-                        b.position.set(content.pos.x, content.pos.y, content.pos.z);
-                        b.quaternion.set(content.quat.x, content.quat.y, content.quat.z, content.quat.w);
-                    }
-                }
-                if (code === EV.LEVEL_CHANGE) loadLevel(content.level);
-            };
-
-            photonClient.connectToRegionMaster("EU"); // Change region if needed
-            photonClient.onRoomList = () => photonClient.joinOrCreateRoom(roomName, { maxPlayers: 8 }, {});
+        function makeRemotePlayer() {
+            const geo = new THREE.BoxGeometry(0.6, 1.6, 0.4);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xff55ff, emissive: 0xff55ff, emissiveIntensity: 0.2 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.position.set(0, 1.6, 0);
+            scene.add(mesh);
+            return mesh;
         }
 
-        document.getElementById('btn-host').addEventListener('click', () => {
-            const appId = document.getElementById('appid-input').value.trim();
-            if (appId) initPhoton(appId, "lobby");
-            else alert("Please enter a Photon App ID");
-        });
-        
-        document.getElementById('btn-join').addEventListener('click', () => {
-            const appId = document.getElementById('appid-input').value.trim();
-            const room = document.getElementById('room-input').value.trim() || "lobby";
-            if (appId) initPhoton(appId, room);
-            else alert("Please enter a Photon App ID");
-        });
-
-        function broadcastPos() {
-            if (!photonClient || !photonClient.isJoinedToRoom()) return;
-            
-            photonClient.raiseEvent(EV.MOVE, {
-                pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
-                quat: { x: camera.quaternion.x, y: camera.quaternion.y, z: camera.quaternion.z, w: camera.quaternion.w }
-            }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.Others });
-
-            if (heldObject) {
-                const idx = bodies.indexOf(heldObject.body);
-                photonClient.raiseEvent(EV.SYNC_OBJ, {
-                    idx: idx,
-                    pos: { x: heldObject.body.position.x, y: heldObject.body.position.y, z: heldObject.body.position.z },
-                    quat: { x: heldObject.body.quaternion.x, y: heldObject.body.quaternion.y, z: heldObject.body.quaternion.z, w: heldObject.body.quaternion.w }
-                }, { receivers: Photon.LoadBalancing.Constants.ReceiverGroup.Others });
-            }
-        }
-
-        // ─── CHAT LOGIC ───────────────────────────────────────────
-        const chatInput = document.getElementById('chat-input');
-        const chatMessages = document.getElementById('chat-messages');
-
-        function addChatMessage(sender, msg, time) {
-            const div = document.createElement('div');
-            const cleanMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const timeStr = time ? new Date(time.toDate()).toLocaleTimeString() : 'now';
-            div.innerHTML = `<span style="color:#ffaa00">[${sender}]</span> (${timeStr}): ${cleanMsg}`;
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Listen for Firebase messages
-        messagesCollection.orderBy("timestamp").onSnapshot((snapshot) => {
-            chatMessages.innerHTML = '';
-            snapshot.forEach((doc) => {
-                const message = doc.data();
-                const sender = message.user || "Unknown";
-                addChatMessage(sender, message.text, message.timestamp);
+        function initPeer() {
+            peer = new Peer();
+            peer.on('open', id => {
+                document.getElementById('peer-id').textContent = id;
+                setPeerStatus('READY', '#00ff00');
             });
-        }, (error) => {
-            console.error("Error getting messages: ", error);
-        });
 
-        function sendChat() {
-            const msg = chatInput.value.trim();
-            if (!msg) return;
-            try {
-                messagesCollection.add({
-                    text: msg,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: "Player"
-                });
-                chatInput.value = '';
-                chatInput.blur();
-                controls.lock();
-            } catch (e) {
-                console.error("Error sending message: ", e);
+            peer.on('connection', connection => {
+                if (conn) {
+                    connection.close();
+                    return;
+                }
+                conn = connection;
+                setupConnection();
+            });
+
+            peer.on('error', err => {
+                console.error('Peer error', err);
+                setPeerStatus('ERROR', '#ff5555');
+            });
+        }
+
+        function setupConnection() {
+            if (!conn) return;
+            conn.on('data', handlePeerData);
+            conn.on('close', () => {
+                setPeerStatus('DISCONNECTED', '#ff5555');
+                conn = null;
+                if (remotePlayer) {
+                    scene.remove(remotePlayer);
+                    remotePlayer = null;
+                }
+            });
+            conn.on('open', () => {
+                setPeerStatus('CONNECTED', '#00ff00');
+                document.getElementById('chat-toggle').style.display = 'inline-block';
+            });
+        }
+
+        function connectPeer() {
+            const target = document.getElementById('friend-id').value.trim();
+            if (!target || !peer || peer.disconnected) return;
+            if (conn) conn.close();
+            conn = peer.connect(target);
+            conn.on('open', () => {
+                setPeerStatus('CONNECTED', '#00ff00');
+            });
+            conn.on('data', handlePeerData);
+            conn.on('close', () => {
+                setPeerStatus('DISCONNECTED', '#ff5555');
+                conn = null;
+                if (remotePlayer) {
+                    scene.remove(remotePlayer);
+                    remotePlayer = null;
+                }
+            });
+        }
+
+        function handlePeerData(data) {
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'move') {
+                if (!remotePlayer) remotePlayer = makeRemotePlayer();
+                remotePlayer.position.set(data.pos.x, data.pos.y, data.pos.z);
+                remotePlayer.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
+                const msg = document.createElement('div');
+                msg.textContent = 'Remote moved to ' + data.pos.x.toFixed(1) + ',' + data.pos.y.toFixed(1) + ',' + data.pos.z.toFixed(1);
+                msg.style.color = '#ffaa00';
+                document.getElementById('chat-messages').appendChild(msg);
+                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            }
+            if (data.type === 'chat') {
+                const msg = document.createElement('div');
+                msg.innerHTML = `<span style="color:#ffaa00">[Friend]</span> ${escapeHtml(data.text)}`;
+                document.getElementById('chat-messages').appendChild(msg);
+                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
             }
         }
 
-        chatInput.addEventListener('keydown', e => {
-            if (e.key === 'Enter') sendChat();
-            e.stopPropagation(); 
+        function sendPeerData(message) {
+            if (!conn || !conn.open) return;
+            conn.send(message);
+        }
+
+        function sendMoveUpdate() {
+            if (!conn || !conn.open) return;
+            const now = performance.now();
+            if (now - lastSentTime < 50) return;
+            if (!lastSentPosition.equals(camera.position) || !lastSentQuaternion.equals(camera.quaternion)) {
+                sendPeerData({
+                    type: 'move',
+                    pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                    quat: { x: camera.quaternion.x, y: camera.quaternion.y, z: camera.quaternion.z, w: camera.quaternion.w }
+                });
+                lastSentTime = now;
+                lastSentPosition.copy(camera.position);
+                lastSentQuaternion.copy(camera.quaternion);
+            }
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        document.getElementById('connect-peer').addEventListener('click', connectPeer);
+        document.getElementById('chat-toggle').addEventListener('click', () => {
+            document.getElementById('chat-container').classList.add('open');
+            document.getElementById('chat-toggle').style.display = 'none';
+        });
+        document.getElementById('chat-close').addEventListener('click', () => {
+            document.getElementById('chat-container').classList.remove('open');
+            if (conn && conn.open) document.getElementById('chat-toggle').style.display = 'inline-block';
         });
 
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && !chatInput.matches(':focus') && !editorMode) {
-                chatInput.focus();
-                controls.unlock();
-                e.preventDefault();
-            }
+        document.getElementById('chat-input').addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const text = e.target.value.trim();
+            if (!text || !conn || !conn.open) return;
+            sendPeerData({ type: 'chat', text });
+            const msg = document.createElement('div');
+            msg.innerHTML = `<span style="color:#55ff55">[You]</span> ${escapeHtml(text)}`;
+            document.getElementById('chat-messages').appendChild(msg);
+            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            e.target.value = '';
         });
+
+        // ─── END PEERJS MULTIPLAYER ─────────────────────────────
 
         document.getElementById('add-box').addEventListener('click', () =>
             addDynamicObject(new THREE.BoxGeometry(1,1,1), new THREE.Vector3(0,3,-3), currentMass));
@@ -958,7 +770,7 @@ const firebaseConfig = {
             }
             meshes.length = 0; bodies.length = 0; updateLevelUI();
         });
-        document.getElementById('reset-level').addEventListener('click', () => loadLevel(currentLevel));
+        document.getElementById('reset-level').addEventListener('click', () => resetSandbox());
         document.getElementById('gravity-slider').addEventListener('input', e => {
             const val = parseFloat(e.target.value);
             if (isNaN(val)) return;
@@ -969,8 +781,6 @@ const firebaseConfig = {
             currentMass = parseFloat(e.target.value);
             document.getElementById('mass-value').textContent = currentMass.toFixed(1);
         });
-        document.getElementById('next-level').addEventListener('click', () => loadLevel(currentLevel + 1));
-        document.getElementById('retry-level').addEventListener('click', () => loadLevel(currentLevel));
 
         // ─── ANIMATION LOOP ───────────────────────────────────────
         const clock = new THREE.Clock();
@@ -981,52 +791,14 @@ const firebaseConfig = {
 
             world.step(1 / 60, dt, 3);
 
-            // Sync and Level Check
-            let countOnPlate = 0;
             for (let i = 0; i < meshes.length; i++) {
                 meshes[i].position.copy(bodies[i].position);
                 meshes[i].quaternion.copy(bodies[i].quaternion);
-                
-                const dX = Math.abs(bodies[i].position.x - plateMesh.position.x);
-                const dZ = Math.abs(bodies[i].position.z - plateMesh.position.z);
-                const dY = bodies[i].position.y - plateMesh.position.y;
-                if (dX < 2 && dZ < 2 && dY > 0 && dY < 1.5) {
-                    countOnPlate++;
-                }
-            }
-            
-            onPlateCount = countOnPlate;
-            const target = levels[currentLevel - 1].count;
-            const isTriggered = onPlateCount >= target;
-
-            // Plate Animation
-            const targetY = isTriggered ? plateBase.position.y : plateBase.position.y + 0.1;
-            plateMesh.position.y = THREE.MathUtils.lerp(plateMesh.position.y, targetY, 0.2);
-            plateMesh.material.emissiveIntensity = isTriggered ? 2.0 : 0.5;
-            plateMesh.material.color.setHex(isTriggered ? 0x00ff00 : 0xff0000);
-            document.getElementById('door-indicator').style.background = isTriggered ? '#0f0' : '#300';
-            document.getElementById('door-indicator').style.boxShadow = isTriggered ? '0 0 15px #0f0' : 'none';
-
-            // Door Animation logic
-            if (doorMesh) {
-                doorTargetY = isTriggered ? 10 : 3.5;
-                doorMesh.position.y = THREE.MathUtils.lerp(doorMesh.position.y, doorTargetY, 0.05);
-                doorBody.position.y = doorMesh.position.y;
-            }
-
-            if (isTriggered && levelActive) {
-                if (currentLevel === 6) {
-                    plateTime += dt;
-                    document.getElementById('progress').textContent = `Holding: ${plateTime.toFixed(1)}s / 3.0s`;
-                    if (plateTime >= 3.0) completeLevel();
-                } else {
-                    completeLevel();
-                }
             }
 
             _camVelocity.copy(camera.position).sub(_prevCamPos).divideScalar(dt);
             _prevCamPos.copy(camera.position);
-            broadcastPos();
+            sendMoveUpdate();
 
             if (controls.isLocked && !editorMode) {
                 // Movement
@@ -1094,8 +866,9 @@ const firebaseConfig = {
             renderer.setSize(innerWidth, innerHeight);
         });
 
+        initPeer();
         animate();
-        loadLevel(1);
+        resetSandbox();
     </script>
 </body>
 </html>
